@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:\\\\Users\\\\youssef\\\\Desktop\\\\budget-tracker mobile\" && powershell -File \".specify/scripts/powershell/create-new-feature.ps1\" \"Flutter Foundation and Navigation - Bootstrap Flutter project with GoRouter Riverpod Dio design tokens and live simulation data rendering\" -Json -ShortName \"flutter-foundation\" 2>&1)",
+      "Bash(cd '/c/Users/youssef/Desktop/budget-tracker mobile' && powershell -File \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -PathsOnly 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\youssef\\\\Desktop\\\\budget-tracker mobile\" && powershell.exe -File \".specify/scripts/powershell/setup-plan.ps1\" -Json 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\youssef\\\\Desktop\\\\budget-tracker mobile\" && powershell.exe -File \".specify/scripts/powershell/update-agent-context.ps1\" -AgentType claude 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\youssef\\\\Desktop\\\\budget-tracker mobile\" && powershell.exe -File \".specify/scripts/powershell/check-prerequisites.ps1\" -Json 2>&1)",
+      "Bash(cd \"/c/Users/youssef/Desktop/budget-tracker mobile\" && powershell.exe -File \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks 2>&1)",
+      "Bash(cd \"/c/Users/youssef/Desktop/budget-tracker mobile\" && flutter analyze 2>&1)",
+      "Bash(cd \"/c/Users/youssef/Desktop/budget-tracker mobile\" && flutter test 2>&1)",
+      "Bash(cd \"/c/Users/youssef/Desktop/budget-tracker mobile\" && flutter devices 2>&1)"
+    ]
+  }
+}
