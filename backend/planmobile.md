@@ -15,32 +15,6 @@
 
 ---
 
-## Quick Start (Daily Development)
-
-```bash
-# 1 — Start the Django backend (mobilebudget venv)
-"C:/Users/youssef/Desktop/budget-tracker mobile/mobilebudget/Scripts/python.exe" \
-  "C:/Users/youssef/Desktop/budget-tracker mobile/backend/manage.py" \
-  runserver 0.0.0.0:8000
-
-# 2 — Run Flutter on Chrome with phone-frame preview
-flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8000/api
-
-# 3 — Run all tests
-flutter test
-
-# 4 — Static analysis (must stay at zero issues)
-flutter analyze
-
-# 5 — Re-generate Riverpod code after editing @riverpod providers
-flutter pub run build_runner build --delete-conflicting-outputs
-```
-
-> **Tip**: The app wraps itself in `DevicePreview` in debug mode. Use the toolbar in Chrome
-> to switch between iPhone 15, Pixel 7, iPad, etc. without needing an emulator.
-
----
-
 ## 1. Product Overview
 
 ### 1.1 What Is This?
@@ -51,6 +25,8 @@ one member receives the total pot (N × monthly contribution). The user logs the
 the app simulates depositing each payout into a compounding investment fund, projecting
 balances, interest, and cash flows across a 12-month period.
 
+An embedded Claude AI advisor answers financial questions in Arabic or English using the
+user's live simulation data as context.
 
 ### 1.2 Build Targets
 
@@ -122,55 +98,6 @@ The backend is split into four backend phases (B1–B4). B1 is already implement
 B2–B4 are required to support the full Flutter client feature set.
 
 ### Backend Phase B1 — Core API ✅ COMPLETE
-
-#### Actual Folder Structure (`backend/`)
-
-```
-backend/
-├── manage.py
-├── requirements.txt          # django, djangorestframework, django-cors-headers, anthropic, python-dotenv
-├── db.sqlite3                # SQLite database (pre-seeded with 4 Gam3as + settings)
-├── .env.example              # ANTHROPIC_API_KEY=sk-ant-...
-│
-├── budget_tracker/           # Django project config
-│   ├── settings.py           # CORS_ALLOW_ALL_ORIGINS, APPEND_SLASH=False, REST_FRAMEWORK
-│   ├── urls.py               # path('api/', include('api.urls'))
-│   └── wsgi.py
-│
-└── api/                      # Main app
-    ├── models.py             # Gam3a · SimulationSettings · MonthlyOverride
-    ├── serializers.py        # Gam3aSerializer · SimulationSettingsSerializer · ScenarioRequestSerializer · ChatRequestSerializer
-    ├── views.py              # Gam3aListCreateView · Gam3aDetailView · SettingsView · SimulateView · ScenarioView · ChatView
-    ├── urls.py               # All API routes (no trailing slashes)
-    ├── simulation.py         # 12-month compound interest engine
-    ├── migrations/
-    │   └── 0001_initial.py
-    └── management/commands/
-        └── seed.py           # python manage.py seed [--reset]
-```
-
-#### Local Setup
-```bash
-# From the project root (budget-tracker mobile/)
-source "/c/Users/youssef/Desktop/budget-tracker mobile/mobilebudget/Scripts/activate"
-pip install -r backend/requirements.txt   # first time only
-cd backend
-python manage.py migrate                  # first time only
-python manage.py seed                     # first time only — loads 4 Gam3as + settings
-python manage.py runserver                # → http://localhost:8000
-```
-
-#### Flutter connection
-```bash
-# Web (Chrome)
-flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8000/api
-
-# Android emulator (10.0.2.2 = host machine's localhost from inside emulator)
-flutter run -d emulator-5554 --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
-
-# iOS simulator
-flutter run -d 'iPhone 15' --dart-define=API_BASE_URL=http://localhost:8000/api
-```
 
 #### Tech Stack
 
@@ -364,6 +291,15 @@ MonthlyOverride: month=1, custom_inflow=0.0
 | Dec | 0 | 3,000 | 318.28 | 17,420.38 |
 
 KPIs: Invested 119,000 · Interest 4,920.38 · Payments 106,500 · Balance 17,420.38 · Yield 4.13%
+
+#### Local Setup
+```bash
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed
+python manage.py runserver        # → http://localhost:8000
+```
 
 ---
 
@@ -600,218 +536,139 @@ SimulationSettings.objects.get_or_create(user=request.user, defaults={...})
 
 ### 3.4 Full API Contract
 
-All calls go through feature-specific `*RepositoryImpl` classes that use the shared `DioClient` singleton. Base URL injected at compile time via `--dart-define=API_BASE_URL`. No business logic in the Flutter client — all math and AI runs server-side.
+All calls originate from `ApiService`. Base URL injected via `--dart-define=API_BASE_URL`.
 
-| Method | Endpoint | Phase | Repository | Provider / Notifier |
-|--------|----------|-------|-----------|---------------------|
-| GET | `/api/simulate` | F1 ✅ | `SimulationRepositoryImpl` | `simulationNotifierProvider` |
-| GET | `/api/gam3as` | F2 ✅ | `Gam3aRepositoryImpl` | `gamAasNotifierProvider` |
-| POST | `/api/gam3as` | F2 ✅ | `Gam3aRepositoryImpl` | `gamAasNotifierProvider.add()` |
-| PUT | `/api/gam3as/{id}` | F2 ✅ | `Gam3aRepositoryImpl` | `gamAasNotifierProvider.edit()` |
-| DELETE | `/api/gam3as/{id}` | F2 ✅ | `Gam3aRepositoryImpl` | `gamAasNotifierProvider.delete()` |
-| GET | `/api/settings` | F4 | `SettingsRepositoryImpl` | `settingsNotifierProvider` |
-| PUT | `/api/settings` | F4 | `SettingsRepositoryImpl` | `settingsNotifierProvider.save()` |
-| POST | `/api/simulate/scenario` | F4 | `ScenarioRepositoryImpl` | `scenarioNotifierProvider.run()` |
-| POST | `/api/chat` | F5 | `ChatRepositoryImpl` | `chatNotifierProvider.send()` |
-| GET | `/api/overrides` | F6 | `OverridesRepositoryImpl` | `overridesNotifierProvider` |
-| POST | `/api/overrides` | F6 | `OverridesRepositoryImpl` | `overridesNotifierProvider.add()` |
-| PUT | `/api/overrides/{month}` | F6 | `OverridesRepositoryImpl` | `overridesNotifierProvider.edit()` |
-| DELETE | `/api/overrides/{month}` | F6 | `OverridesRepositoryImpl` | `overridesNotifierProvider.delete()` |
-| GET | `/api/actuals` | F6 | `ActualsRepositoryImpl` | `actualsNotifierProvider` |
-| POST | `/api/actuals` | F6 | `ActualsRepositoryImpl` | `actualsNotifierProvider.log()` |
-| PUT | `/api/actuals/{month}` | F6 | `ActualsRepositoryImpl` | `actualsNotifierProvider.edit()` |
-| POST | `/api/auth/register` | F7 | `AuthRepositoryImpl` | `authNotifierProvider.register()` |
-| POST | `/api/auth/login` | F7 | `AuthRepositoryImpl` | `authNotifierProvider.login()` |
-| POST | `/api/auth/refresh` | F7 | `AuthRepositoryImpl` | `authNotifierProvider.refresh()` |
+| Method | Endpoint | Flutter Phase | Provider |
+|--------|----------|--------------|----------|
+| GET | `/api/simulate` | F1 | `simulationProvider` |
+| GET | `/api/gam3as` | F2 | `gam3asProvider` |
+| POST | `/api/gam3as` | F2 | `gam3asProvider.add()` |
+| PUT | `/api/gam3as/{id}` | F2 | `gam3asProvider.update()` |
+| DELETE | `/api/gam3as/{id}` | F2 | `gam3asProvider.delete()` |
+| GET | `/api/settings` | F4 | `settingsProvider` |
+| PUT | `/api/settings` | F4 | `settingsProvider.update()` |
+| POST | `/api/simulate/scenario` | F4 | `scenarioProvider.run()` |
+| POST | `/api/chat` | F5 | `chatProvider.send()` |
+| GET | `/api/overrides` | F6 | `overridesProvider` |
+| POST | `/api/overrides` | F6 | `overridesProvider.add()` |
+| PUT | `/api/overrides/{month}` | F6 | `overridesProvider.update()` |
+| DELETE | `/api/overrides/{month}` | F6 | `overridesProvider.delete()` |
+| GET | `/api/actuals` | F6 | `actualsProvider` |
+| POST | `/api/actuals` | F6 | `actualsProvider.log()` |
+| PUT | `/api/actuals/{month}` | F6 | `actualsProvider.update()` |
+| POST | `/api/auth/register` | F7 | `authProvider.register()` |
+| POST | `/api/auth/login` | F7 | `authProvider.login()` |
+| POST | `/api/auth/refresh` | F7 | `authProvider.refresh()` |
 
 ### 3.5 Dependency Manifest (`pubspec.yaml`)
-
-Packages currently **installed** are marked ✅. Future phases listed below.
 
 ```yaml
 dependencies:
   flutter:
     sdk: flutter
 
-  # Phase F1 — Foundation ✅
-  flutter_riverpod: ^2.5.1        # ✅ installed
-  riverpod_annotation: ^2.3.5     # ✅ installed
-  go_router: ^14.0.0              # ✅ installed
-  dio: ^5.4.0                     # ✅ installed
-  shared_preferences: ^2.2.3      # ✅ installed
-  intl: ^0.20.2                   # ✅ installed (bumped from ^0.19.0 for device_preview)
+  # Phase F1 — Foundation
+  go_router: ^14.0.0
+  flutter_riverpod: ^2.5.0
+  riverpod_annotation: ^2.3.0
+  dio: ^5.4.0
+  shared_preferences: ^2.2.0
 
-  # Dev tooling — phone-frame preview ✅
-  device_preview: ^1.2.0          # ✅ installed (Chrome dev only, disabled in release)
-
-  # Phase F3 — Dashboard Charts
-  fl_chart: ^0.68.0               # add when implementing F3
+  # Phase F3 — Charts
+  fl_chart: ^0.68.0
 
   # Phase F7 — Auth
-  flutter_secure_storage: ^9.0.0  # add when implementing F7
+  flutter_secure_storage: ^9.0.0
 
   # Phase F8 — Offline & Notifications
-  connectivity_plus: ^6.0.0       # add when implementing F8
-  flutter_local_notifications: ^17.0.0  # add when implementing F8
+  connectivity_plus: ^6.0.0
+  flutter_local_notifications: ^17.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0           # ✅ installed
-  riverpod_generator: ^2.4.0      # ✅ installed (code-gen for @riverpod)
-  build_runner: ^2.4.9            # ✅ installed
-  mocktail: ^1.0.4                # ✅ installed
-  riverpod_lint: ^2.3.10          # ✅ installed (Riverpod-specific lint rules)
-  custom_lint: ^0.6.4             # ✅ installed (required by riverpod_lint)
+  riverpod_generator: ^2.4.0
+  build_runner: ^2.4.0
+  mocktail: ^1.0.0
+  flutter_lints: ^4.0.0
 ```
 
 ### 3.6 Full File Structure
 
-Feature-module architecture: each feature owns its own `domain/`, `data/`, `application/`, and `presentation/` layers. Cross-feature communication goes through `lib/core/` only.
-
 ```text
-budget_tracker_mobile/          # repo root
-│
+flutter_app/
 ├── lib/
-│   ├── main.dart               # DevicePreview wrapper → ProviderScope → App  ✅ F1
-│   ├── app.dart                # MaterialApp.router, ThemeData, locale wiring  ✅ F1
+│   ├── main.dart                          # ProviderScope, ThemeData, runApp
+│   ├── router.dart                        # GoRouter routes + auth redirect guard
 │   │
-│   ├── core/
-│   │   ├── constants/
-│   │   │   └── app_colors.dart             # All AppColors.* design tokens      ✅ F1
-│   │   ├── network/
-│   │   │   └── dio_client.dart             # Singleton Dio, baseUrl dart-define  ✅ F1
-│   │   ├── cache/
-│   │   │   └── cache_service.dart          # SharedPreferences CRUD wrapper      ✅ F1
-│   │   └── routing/
-│   │       └── app_router.dart             # GoRouter: ShellRoute + full-screen  ✅ F1/F2
+│   ├── screens/
+│   │   ├── dashboard_screen.dart          # F1/F3
+│   │   ├── gam3as_screen.dart             # F2
+│   │   ├── gam3a_form_screen.dart         # F2 — add / edit form
+│   │   ├── scenario_screen.dart           # F4
+│   │   ├── chat_screen.dart               # F5 — full-screen modal route
+│   │   ├── overrides_screen.dart          # F6
+│   │   ├── actuals_screen.dart            # F6
+│   │   └── auth/
+│   │       ├── login_screen.dart          # F7
+│   │       └── register_screen.dart       # F7
 │   │
-│   ├── features/
-│   │   │
-│   │   ├── simulation/                     # F1 — Simulation engine
-│   │   │   ├── domain/
-│   │   │   │   ├── simulation_result.dart  # Top-level response model            ✅ F1
-│   │   │   │   ├── monthly_row.dart        # Per-month row                       ✅ F1
-│   │   │   │   └── kpis.dart               # KPI summary object                  ✅ F1
-│   │   │   ├── data/
-│   │   │   │   └── simulation_repository.dart  # Abstract + Impl (Dio)           ✅ F1
-│   │   │   └── application/
-│   │   │       └── simulation_provider.dart    # AsyncNotifierProvider           ✅ F1
-│   │   │
-│   │   ├── dashboard/                      # F1/F3
-│   │   │   └── presentation/
-│   │   │       ├── dashboard_screen.dart   # KPI cards, chart, table             ✅ F1 (stub → F3 full)
-│   │   │       └── widgets/
-│   │   │           ├── kpi_card.dart       # F3
-│   │   │           ├── simulation_chart.dart  # fl_chart wrapper                 F3
-│   │   │           └── monthly_table.dart  # 12-row scrollable table             F3
-│   │   │
-│   │   ├── gam3as/                         # F2 — Gam3a Manager ✅ COMPLETE
-│   │   │   ├── domain/
-│   │   │   │   └── gam3a.dart              # Immutable domain model, piastres    ✅ F2
-│   │   │   ├── data/
-│   │   │   │   ├── gam3a_repository.dart       # Abstract interface              ✅ F2
-│   │   │   │   └── gam3a_repository_impl.dart  # Dio impl, DioException mapping  ✅ F2
-│   │   │   ├── application/
-│   │   │   │   ├── gam3as_provider.dart    # GamAasNotifier + cache + stale flag ✅ F2
-│   │   │   │   └── gam3as_provider.g.dart  # Generated by build_runner           ✅ F2
-│   │   │   └── presentation/
-│   │   │       ├── gam3as_screen.dart      # List + FAB + stale banner           ✅ F2
-│   │   │       ├── gam3a_form_screen.dart  # Add / edit form (6 fields)          ✅ F2
-│   │   │       └── widgets/
-│   │   │           ├── gam3a_card.dart     # Card with edit/delete actions       ✅ F2
-│   │   │           └── empty_gam3as_view.dart  # Empty-state widget              ✅ F2
-│   │   │
-│   │   ├── scenario/                       # F4 — Scenario Simulator
-│   │   │   ├── domain/
-│   │   │   │   └── simulation_settings.dart    # Rate, investment day, extras    F4
-│   │   │   ├── data/
-│   │   │   │   └── scenario_repository.dart    # Abstract + Impl                 F4
-│   │   │   ├── application/
-│   │   │   │   └── scenario_provider.dart      # Independent from simProvider    F4
-│   │   │   └── presentation/
-│   │   │       └── scenario_screen.dart         # What-if form + SIMULATION MODE F4
-│   │   │
-│   │   ├── chat/                           # F5 — AI Chat
-│   │   │   ├── domain/
-│   │   │   │   └── chat_message.dart       # role, content, isRTL               F5
-│   │   │   ├── data/
-│   │   │   │   └── chat_repository.dart    # Abstract + Impl (POST /api/chat)   F5
-│   │   │   ├── application/
-│   │   │   │   └── chat_provider.dart      # History state, RTL detection       F5
-│   │   │   └── presentation/
-│   │   │       ├── chat_screen.dart        # Full-screen modal route             F5
-│   │   │       └── widgets/
-│   │   │           └── chat_bubble.dart    # LTR/RTL bubble widget              F5
-│   │   │
-│   │   ├── overrides/                      # F6 — Overrides & Actuals
-│   │   │   ├── domain/
-│   │   │   │   ├── monthly_override.dart   # Override model                     F6
-│   │   │   │   └── monthly_actual.dart     # Actual model                       F6
-│   │   │   ├── data/
-│   │   │   │   ├── overrides_repository.dart   # Abstract + Impl                F6
-│   │   │   │   └── actuals_repository.dart     # Abstract + Impl                F6
-│   │   │   ├── application/
-│   │   │   │   ├── overrides_provider.dart                                      F6
-│   │   │   │   └── actuals_provider.dart                                        F6
-│   │   │   └── presentation/
-│   │   │       ├── overrides_screen.dart                                        F6
-│   │   │       └── actuals_screen.dart                                          F6
-│   │   │
-│   │   └── auth/                           # F7 — Authentication
-│   │       ├── domain/
-│   │       │   └── auth_token.dart         # Access + refresh token pair        F7
-│   │       ├── data/
-│   │       │   └── auth_repository.dart    # Abstract + Impl (register/login)   F7
-│   │       ├── application/
-│   │       │   └── auth_provider.dart      # Token state, interceptor ref       F7
-│   │       └── presentation/
-│   │           ├── login_screen.dart                                            F7
-│   │           └── register_screen.dart                                         F7
+│   ├── widgets/
+│   │   ├── scaffold_with_nav.dart         # F1 — adaptive nav shell
+│   │   ├── kpi_card.dart                  # F3
+│   │   ├── simulation_chart.dart          # F3 — fl_chart wrapper
+│   │   ├── monthly_table.dart             # F3
+│   │   ├── gam3a_card.dart                # F2
+│   │   ├── chat_bubble.dart               # F5
+│   │   └── offline_banner.dart            # F8
 │   │
-│   └── shared/
-│       └── widgets/
-│           ├── scaffold_with_nav.dart      # Adaptive NavigationBar/Rail shell  ✅ F1
-│           └── offline_banner.dart         # MaterialBanner (connectivity)      F8
+│   ├── providers/
+│   │   ├── simulation_provider.dart       # F1
+│   │   ├── gam3as_provider.dart           # F2
+│   │   ├── settings_provider.dart         # F4
+│   │   ├── scenario_provider.dart         # F4
+│   │   ├── chat_provider.dart             # F5
+│   │   ├── overrides_provider.dart        # F6
+│   │   ├── actuals_provider.dart          # F6
+│   │   └── auth_provider.dart             # F7
+│   │
+│   ├── services/
+│   │   ├── api_service.dart               # Dio client, base URL, timeouts, interceptors
+│   │   ├── cache_service.dart             # SharedPreferences read/write
+│   │   └── notification_service.dart      # F8 — flutter_local_notifications
+│   │
+│   ├── models/
+│   │   ├── gam3a.dart                     # fromJson / toJson
+│   │   ├── simulation_result.dart
+│   │   ├── monthly_row.dart
+│   │   ├── kpis.dart
+│   │   ├── simulation_settings.dart
+│   │   ├── monthly_override.dart          # F6
+│   │   ├── monthly_actual.dart            # F6
+│   │   └── auth_token.dart                # F7
+│   │
+│   └── constants/
+│       ├── theme.dart                     # AppColors, ThemeData
+│       └── api_endpoints.dart             # Endpoint path constants
 │
 ├── test/
-│   ├── features/
-│   │   ├── simulation/
-│   │   │   └── simulation_provider_test.dart   ✅ F1
-│   │   └── gam3as/
-│   │       ├── gam3a_test.dart                 ✅ F2 (domain model / fromJson)
-│   │       ├── gam3as_provider_test.dart        ✅ F2 (10 cases, MockRepository)
-│   │       └── gam3a_card_test.dart             ✅ F2 (5 widget tests)
-│   └── shared/
-│       └── widgets/                            # scaffold, offline banner tests
+│   ├── services/api_service_test.dart
+│   ├── providers/
+│   │   ├── simulation_provider_test.dart
+│   │   └── gam3as_provider_test.dart
+│   └── widgets/
+│       ├── kpi_card_test.dart
+│       └── gam3a_card_test.dart
 │
-├── backend/                                    # Django REST API  ✅ B1
-│   ├── budget_tracker/
-│   │   ├── settings.py                         # CORS, DRF, SQLite, APPEND_SLASH=False
-│   │   ├── urls.py                             # path('api/', include('api.urls'))
-│   │   └── wsgi.py
-│   └── api/
-│       ├── models.py                           # Gam3a model
-│       ├── serializers.py                      # Gam3aSerializer
-│       ├── views.py                            # Simulation + CRUD APIViews
-│       ├── simulation_engine.py                # 12-month compound interest engine
-│       └── urls.py                             # All /api/* routes
-│
-├── specs/                                      # Spec Kit specs (one per phase)
-│   ├── 001-flutter-foundation/                 # F1 ✅
-│   └── 002-gam3as-management/                  # F2 ✅
-│
-├── mobilebudget/                               # Python venv (not committed)
-├── web/                                        # Flutter web build target
-├── android/                                    # Flutter Android target
-├── ios/                                        # Flutter iOS target
-├── pubspec.yaml
-└── planmobile.md                               # This document
+├── web/                                   # Auto-generated Flutter web target
+├── android/                               # Auto-generated Flutter Android target
+├── ios/                                   # Auto-generated Flutter iOS target
+└── pubspec.yaml
 ```
 
 ### 3.7 Design Token Reference
 
-All values defined in `lib/core/constants/app_colors.dart`. No inline hex values elsewhere.
+All values defined in `lib/constants/theme.dart`. No inline hex values elsewhere.
 
 | Token | Hex | Dart Constant | Usage |
 |-------|-----|--------------|-------|
@@ -858,20 +715,20 @@ flutter build ipa   --dart-define=API_BASE_URL=https://api.yourdomain.com/api
 
 ## 4. Full Phase Execution Plan
 
-| # | Spec | Name | Backend changes needed | Flutter | Status |
-|---|------|------|----------------------|---------|--------|
-| B1 | `specs/b01-core-api` | Core Django API | `backend/` — all models, views, simulation engine | — | ✅ Done |
-| F1 | `specs/001-flutter-foundation` | Foundation & Navigation | None — B1 already live | Project boots, nav shell, SimulationProvider | ✅ Done |
-| F2 | `specs/002-gam3as-management` | Gam3a Manager | None — CRUD already in B1 | Full CRUD screens + cache | ✅ Done |
-| F3 | `specs/003-dashboard-charts` | Dashboard & Charts | None — `/api/simulate` already live | Add `fl_chart` · KPI cards · line chart · monthly table | 🔲 Next |
-| F4 | `specs/004-scenario-simulator` | Scenario Simulator | None — `/api/simulate/scenario` already live | Scenario screen · ScenarioProvider · what-if UI | 🔲 Planned |
-| F5 | `specs/005-ai-chat` | AI Chat | None — `/api/chat` already live | Chat screen · ChatProvider · bilingual Claude modal | 🔲 Planned |
-| B2 | `specs/b02-overrides-api` | Overrides Endpoints | Add to `backend/api/`: `OverrideListCreateView`, `OverrideDetailView`, `MonthlyOverrideSerializer`, routes | — | 🔲 Before F6 |
-| B3 | `specs/b03-actuals-api` | Actuals API | Add to `backend/api/`: `MonthlyActual` model + migration, `ActualsView`, `MonthlyActualSerializer`, routes | — | 🔲 Before F6 |
-| F6 | `specs/006-overrides-actuals` | Overrides & Actuals UI | Requires B2 + B3 | Override + actuals screens | 🔲 Planned |
-| B4 | `specs/b04-auth` | JWT Authentication | Add `djangorestframework-simplejwt` · `django.contrib.auth` · user FK on all models · auth endpoints | — | 🔲 Before F7 |
-| F7 | `specs/007-auth` | Authentication | Requires B4 | Login/register · `flutter_secure_storage` · token interceptor | 🔲 Planned |
-| F8 | `specs/008-offline-notifications` | Offline & Notifications | None | `connectivity_plus` · `flutter_local_notifications` | 🔲 Planned |
+| # | Spec | Name | Backend | Flutter | Status |
+|---|------|------|---------|---------|--------|
+| B1 | `b01-core-api` | Core Django API | ✅ Complete | — | Done |
+| B2 | `b02-overrides-api` | Overrides Endpoints | New endpoints for existing model | — | 🔲 Before F6 |
+| B3 | `b03-actuals-api` | Actuals API | New model + endpoints | — | 🔲 Before F6 |
+| B4 | `b04-auth` | JWT Authentication | JWT + user scoping | — | 🔲 Before F7 |
+| F1 | `f01-flutter-foundation` | Foundation & Navigation | None | Project boots on all 3 targets | 🔲 Next |
+| F2 | `f02-gam3a-manager` | Gam3a Manager | None | Full CRUD on all platforms | 🔲 Planned |
+| F3 | `f03-dashboard-charts` | Dashboard & Charts | None | KPI cards + chart + table | 🔲 Planned |
+| F4 | `f04-scenario-simulator` | Scenario Simulator | None | What-if simulation | 🔲 Planned |
+| F5 | `f05-ai-chat` | AI Chat | None | Bilingual Claude chat modal | 🔲 Planned |
+| F6 | `f06-overrides-actuals` | Overrides & Actuals UI | Requires B2 + B3 | Override + actuals screens | 🔲 Planned |
+| F7 | `f07-auth` | Authentication | Requires B4 | Login/register, per-user data | 🔲 Planned |
+| F8 | `f08-offline-notifications` | Offline & Notifications | None | Offline cache + push reminders | 🔲 Planned |
 
 ---
 
@@ -879,11 +736,11 @@ flutter build ipa   --dart-define=API_BASE_URL=https://api.yourdomain.com/api
 
 ---
 
-### Flutter Phase F1 — Foundation & Navigation ✅ COMPLETE
-**Spec**: `specs/001-flutter-foundation/`
-**Branch**: `main` (merged)
-**Backend required**: B1 ✅
-**Packages added**: `go_router` · `flutter_riverpod` · `riverpod_annotation` · `dio` · `shared_preferences` · `intl`
+### Flutter Phase F1 — Foundation & Navigation
+**Spec**: `specs/f01-flutter-foundation/spec.md`
+**Branch**: `f01-flutter-foundation`
+**Backend required**: B1 (already complete)
+**New packages**: `go_router` · `flutter_riverpod` · `riverpod_annotation` · `dio` · `shared_preferences`
 
 #### Summary
 Bootstrap the Flutter project for all three targets. Configure the layered architecture
@@ -892,12 +749,12 @@ on screen. This phase proves the client communicates with the Django backend on 
 platforms.
 
 #### Definition of Done
-- [X] `flutter run` succeeds on Chrome with zero errors (device_preview on Chrome for phone-frame)
-- [X] `GET /api/simulate` deserializes into `SimulationResult` and renders on screen
-- [X] All 3 navigation destinations reachable without crash
-- [X] Design tokens applied — colors match Section 3.7
-- [X] `flutter analyze` reports zero warnings
-- [X] `SimulationProvider` unit test covers loading, success, and network error states
+- [ ] `flutter run` succeeds on Chrome, Android emulator, and iOS simulator with zero errors
+- [ ] `GET /api/simulate` deserializes into `SimulationResult` and renders on screen
+- [ ] All 3 navigation destinations reachable without crash
+- [ ] Design tokens applied — colors match Section 3.7
+- [ ] `flutter analyze` reports zero warnings
+- [ ] `SimulationProvider` unit test covers loading, success, and network error states
 
 #### User Stories
 
@@ -932,22 +789,22 @@ Acceptance Scenarios:
 
 ---
 
-### Flutter Phase F2 — Gam3a Manager ✅ COMPLETE
-**Spec**: `specs/002-gam3as-management/`
-**Branch**: `002-gam3as-management` (in progress)
-**Backend required**: B1 ✅
-**Packages added**: `device_preview ^1.2.0` (dev/debug preview only)
+### Flutter Phase F2 — Gam3a Manager
+**Spec**: `specs/f02-gam3a-manager/spec.md`
+**Branch**: `f02-gam3a-manager`
+**Backend required**: B1 (already complete)
+**New packages**: None
 
 #### Summary
 Full CRUD management of gam3as from any platform. Saving any change invalidates
 `simulationProvider` so the Dashboard reflects updated projections immediately.
 
 #### Definition of Done
-- [X] All four endpoints (`GET POST PUT DELETE /api/gam3as`) called correctly
-- [X] Form validation blocks submission on missing required fields
-- [X] Saving or deleting triggers a simulation re-fetch on the Dashboard
-- [X] Delete requires `AlertDialog` confirmation
-- [X] `GamAasNotifier` unit tests: add, edit, delete, error + stale-cache fallback (10 test cases)
+- [ ] All four endpoints (`GET POST PUT DELETE /api/gam3as`) called correctly
+- [ ] Form validation blocks submission on missing required fields
+- [ ] Saving or deleting triggers a simulation re-fetch on the Dashboard
+- [ ] Delete requires `AlertDialog` confirmation
+- [ ] `Gam3aProvider` unit tests: add, update, delete, validation error
 
 #### User Stories
 
@@ -985,10 +842,10 @@ Acceptance Scenarios:
 
 ---
 
-### Flutter Phase F3 — Dashboard & Charts 🔲 NEXT
-**Spec**: `specs/003-dashboard-charts/` (run `/speckit.specify` to create)
-**Branch**: `003-dashboard-charts`
-**Backend required**: B1 ✅ — `/api/simulate` already live, no backend changes needed
+### Flutter Phase F3 — Dashboard & Charts
+**Spec**: `specs/f03-dashboard-charts/spec.md`
+**Branch**: `f03-dashboard-charts`
+**Backend required**: B1 (already complete)
 **New packages**: `fl_chart: ^0.68.0`
 
 #### Summary
@@ -1039,9 +896,9 @@ Acceptance Scenarios:
 ---
 
 ### Flutter Phase F4 — Scenario Simulator
-**Spec**: `specs/004-scenario-simulator/spec.md`
-**Branch**: `004-scenario-simulator`
-**Backend required**: B1 ✅ (already complete — `/api/simulate/scenario` is live)
+**Spec**: `specs/f04-scenario-simulator/spec.md`
+**Branch**: `f04-scenario-simulator`
+**Backend required**: B1 (already complete)
 **New packages**: None
 
 #### Summary
@@ -1084,9 +941,9 @@ Acceptance Scenarios:
 ---
 
 ### Flutter Phase F5 — AI Chat
-**Spec**: `specs/005-ai-chat/spec.md`
-**Branch**: `005-ai-chat`
-**Backend required**: B1 ✅ (already complete — `/api/chat` is live)
+**Spec**: `specs/f05-ai-chat/spec.md`
+**Branch**: `f05-ai-chat`
+**Backend required**: B1 (already complete)
 **New packages**: None
 
 #### Summary
@@ -1139,8 +996,8 @@ Acceptance Scenarios:
 ---
 
 ### Flutter Phase F6 — Overrides & Actuals UI
-**Spec**: `specs/006-overrides-actuals/spec.md`
-**Branch**: `006-overrides-actuals`
+**Spec**: `specs/f06-overrides-actuals/spec.md`
+**Branch**: `f06-overrides-actuals`
 **Backend required**: B2 + B3 must be complete first
 **New packages**: None
 
@@ -1184,8 +1041,8 @@ Acceptance Scenarios:
 ---
 
 ### Flutter Phase F7 — Authentication
-**Spec**: `specs/007-auth/spec.md`
-**Branch**: `007-auth`
+**Spec**: `specs/f07-auth/spec.md`
+**Branch**: `f07-auth`
 **Backend required**: B4 must be complete first
 **New packages**: `flutter_secure_storage: ^9.0.0`
 
@@ -1237,8 +1094,8 @@ Acceptance Scenarios:
 ---
 
 ### Flutter Phase F8 — Offline Support & Push Notifications
-**Spec**: `specs/008-offline-notifications/spec.md`
-**Branch**: `008-offline-notifications`
+**Spec**: `specs/f08-offline-notifications/spec.md`
+**Branch**: `f08-offline-notifications`
 **Backend required**: None
 **New packages**: `connectivity_plus: ^6.0.0` · `flutter_local_notifications: ^17.0.0`
 **Platform note**: Both features apply to iOS and Android only. All code guarded with `if (!kIsWeb)`.

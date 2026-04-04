@@ -1,8 +1,10 @@
-# Gam3ya Investment Simulator Development Guidelines
+﻿# Gam3ya Investment Simulator Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-03
+Auto-generated from all feature plans. Last updated: 2026-04-04
 
 ## Active Technologies
+- Dart 3.x · Flutter 3.x (stable channel) + flutter_riverpod ^2.5.1 · riverpod_annotation ^2.3.5 · go_router ^14.0.0 · dio ^5.4.0 · intl ^0.19.0 (all already in pubspec.yaml — no new packages needed) (002-gam3as-management)
+- SharedPreferences for list cache (same pattern as SimulationResult cache in F1) (002-gam3as-management)
 
 | Layer | Technology |
 |---|---|
@@ -76,6 +78,7 @@ flutter build web --dart-define=API_BASE_URL=https://api.yourdomain.com/api
 - Commit messages must reference task ID: `feat(dashboard): T012 implement KPI cards`
 
 ## Recent Changes
+- 002-gam3as-management: Added Dart 3.x · Flutter 3.x (stable channel) + flutter_riverpod ^2.5.1 · riverpod_annotation ^2.3.5 · go_router ^14.0.0 · dio ^5.4.0 · intl ^0.19.0 (all already in pubspec.yaml — no new packages needed)
 
 - **001-flutter-foundation** (2026-04-03): Flutter client foundation — Riverpod, GoRouter,
   Dio, SharedPreferences, adaptive nav shell, SimulationProvider, CacheService

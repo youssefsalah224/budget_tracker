@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Gam3ya Investment Simulator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#1A1A2E;--surface:#16213E;--accent:#0F3460;
+    --positive:#10B981;--negative:#E74C3C;--payout:#F59E0B;
+    --text:#FFFFFF;--muted:#94A3B8;--blue:#3B82F6;--border:rgba(15,52,96,0.6);
+  }
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-track{background:var(--surface)}
+  ::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px}
+
+  /* SIDEBAR */
+  #sidebar{width:320px;min-width:320px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
+  .sidebar-header{padding:20px 16px 12px;border-bottom:1px solid var(--border)}
+  .sidebar-header h1{font-size:16px;font-weight:700;color:var(--text)}
+  .sidebar-header p{font-size:11px;color:var(--muted);margin-top:2px}
+  .sidebar-section{padding:16px}
+  .sidebar-section h2{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+  .form-row{margin-bottom:10px}
+  .form-row label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+  .form-row input,.form-row select{width:100%;background:var(--bg);border:1px solid var(--accent);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;outline:none}
+  .form-row input:focus,.form-row select:focus{border-color:var(--blue)}
+  .form-row select option{background:var(--bg)}
+  .btn{padding:8px 14px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:opacity .2s}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-primary:hover{opacity:.85}
+  .btn-sm{padding:5px 10px;font-size:11px}
+  .btn-danger{background:var(--negative);color:#fff}
+  .btn-edit{background:var(--accent);color:#fff}
+  .btn-group{display:flex;gap:6px;margin-top:10px}
+  .divider{border:none;border-top:1px solid var(--border);margin:4px 0 12px}
+
+  /* Gam3a cards */
+  .gam3a-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px}
+  .gam3a-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .gam3a-name{font-size:13px;font-weight:700}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600}
+  .badge-received{background:rgba(16,185,129,.15);color:var(--positive)}
+  .badge-pending{background:rgba(59,130,246,.15);color:var(--blue)}
+  .gam3a-info{font-size:11px;color:var(--muted);line-height:1.7}
+  .gam3a-info span.green{color:var(--positive)}
+  .gam3a-info span.red{color:var(--negative)}
+  .gam3a-info span.amber{color:var(--payout)}
+
+  /* MAIN */
+  #main{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+  .tabs{display:flex;gap:6px}
+  .tab{padding:7px 16px;border-radius:6px;border:1px solid transparent;cursor:pointer;font-size:13px;font-weight:600;background:transparent;color:var(--muted);transition:all .2s}
+  .tab.active{background:var(--accent);color:var(--text);border-color:var(--blue)}
+  .tab:hover:not(.active){color:var(--text)}
+  .btn-chat{background:var(--accent);color:var(--text);border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;transition:opacity .2s}
+  .btn-chat:hover{opacity:.85}
+  .chat-dot{width:8px;height:8px;background:var(--positive);border-radius:50%;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  #content{flex:1;overflow-y:auto;padding:20px}
+
+  /* KPI CARDS */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+  .kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+  .kpi-card.blue{border-left:3px solid var(--blue)}
+  .kpi-card.green{border-left:3px solid var(--positive)}
+  .kpi-card.red{border-left:3px solid var(--negative)}
+  .kpi-card.amber{border-left:3px solid var(--payout)}
+  .kpi-label{font-size:11px;color:var(--muted);margin-bottom:6px}
+  .kpi-value{font-size:22px;font-weight:700}
+  .kpi-card.blue .kpi-value{color:var(--blue)}
+  .kpi-card.green .kpi-value{color:var(--positive)}
+  .kpi-card.red .kpi-value{color:var(--negative)}
+  .kpi-card.amber .kpi-value{color:var(--payout)}
+  .kpi-sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+  /* CHART */
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px}
+  .chart-card h3{font-size:13px;font-weight:600;margin-bottom:14px;color:var(--muted)}
+  .chart-wrap{position:relative;height:220px}
+
+  /* TABLE */
+  .table-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+  .table-card h3{font-size:13px;font-weight:600;padding:14px 16px;border-bottom:1px solid var(--border);color:var(--muted)}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:right;padding:9px 14px;color:var(--muted);font-weight:600;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap}
+  th:first-child{text-align:left}
+  td{text-align:right;padding:9px 14px;border-bottom:1px solid rgba(15,52,96,.3);white-space:nowrap}
+  td:first-child{text-align:left;font-weight:600}
+  tr:last-child td{border-bottom:none}
+  tr.payout-row{background:rgba(245,158,11,.06)}
+  .val-green{color:var(--positive);font-weight:600}
+  .val-red{color:var(--negative);font-weight:600}
+  .val-amber{color:var(--payout);font-weight:600}
+  .payout-badge{background:rgba(245,158,11,.2);color:var(--payout);padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;margin-left:6px}
+
+  /* SCENARIO */
+  .scenario-header{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+  .scenario-badge{background:rgba(245,158,11,.15);color:var(--payout);padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
+  .scenario-note{font-size:11px;color:var(--muted)}
+  .scenario-controls{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px}
+  .inflows-grid{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px}
+  .inflows-grid h3{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:14px}
+  .inflow-inputs{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  @media(max-width:900px){.inflow-inputs{grid-template-columns:repeat(4,1fr)}}
+  .inflow-input-wrap label{font-size:10px;color:var(--muted);display:block;margin-bottom:4px}
+  .inflow-input-wrap input{width:100%;background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--blue);color:var(--text);padding:6px 8px;border-radius:6px;font-size:12px;outline:none}
+  .inflow-input-wrap input:focus{border-color:var(--blue)}
+  .sim-mode .kpi-card{border-top:2px solid var(--payout)}
+
+  /* AI CHAT DRAWER */
+  #chat-drawer{position:fixed;top:0;right:0;width:384px;height:100vh;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s ease;z-index:100}
+  #chat-drawer.open{transform:translateX(0)}
+  .chat-header{padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .chat-header-info h3{font-size:14px;font-weight:700}
+  .chat-header-info p{font-size:10px;color:var(--muted);margin-top:2px}
+  .btn-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;line-height:1;padding:4px 8px;border-radius:4px}
+  .btn-close:hover{color:var(--text);background:rgba(255,255,255,.05)}
+  .chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{background:var(--accent);color:var(--muted);border:1px solid var(--border);padding:5px 10px;border-radius:999px;font-size:11px;cursor:pointer;transition:all .2s}
+  .chip:hover{color:var(--text);border-color:var(--blue)}
+  .msg{max-width:90%;padding:10px 13px;border-radius:10px;font-size:13px;line-height:1.5;word-break:break-word}
+  .msg.user{align-self:flex-end;background:#0F3460;color:var(--text);border-bottom-right-radius:2px}
+  .msg.assistant{align-self:flex-start;background:var(--bg);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:2px}
+  .msg.rtl{direction:rtl;text-align:right}
+  .typing{display:flex;gap:4px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;align-self:flex-start;width:fit-content}
+  .typing span{width:7px;height:7px;background:var(--muted);border-radius:50%;animation:bounce .9s infinite}
+  .typing span:nth-child(2){animation-delay:.15s}
+  .typing span:nth-child(3){animation-delay:.3s}
+  @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+  .chat-input-area{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end}
+  .chat-input-area textarea{flex:1;background:var(--bg);border:1px solid var(--accent);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;resize:none;outline:none;line-height:1.4;max-height:100px;font-family:inherit}
+  .chat-input-area textarea:focus{border-color:var(--blue)}
+  .btn-send{background:var(--blue);color:#fff;border:none;padding:9px 14px;border-radius:8px;cursor:pointer;font-size:16px;line-height:1;transition:opacity .2s}
+  .btn-send:hover{opacity:.85}
+  .btn-send:disabled{opacity:.4;cursor:not-allowed}
+
+  /* LOADING */
+  .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--accent);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-row td{text-align:center;padding:30px;color:var(--muted)}
+
+  /* EMPTY */
+  .empty{text-align:center;padding:20px 0;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <h1> youssefs Gam3ya Simulator</h1>
+    <p>Investment Fund Tracker · 2026</p>
+  </div>
+
+  <!-- Fund Settings -->
+  <div class="sidebar-section">
+    <h2>Fund Settings</h2>
+    <div class="form-row">
+      <label>Annual Rate (%)</label>
+      <input type="number" id="s-rate" step="0.1" min="0" max="100"/>
+    </div>
+    <div class="form-row">
+      <label>Investment Day (1–28)</label>
+      <input type="number" id="s-day" min="1" max="28"/>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="saveSettings()">Save Settings</button>
+  </div>
+
+  <hr class="divider" style="margin:0 16px"/>
+
+  <!-- Gam3a Manager -->
+  <div class="sidebar-section">
+    <h2>Gam3a Manager</h2>
+
+    <!-- Add / Edit Form -->
+    <div id="gam3a-form">
+      <div class="form-row">
+        <label>Name</label>
+        <input type="text" id="g-name" placeholder="e.g. Gam3a #5"/>
+      </div>
+      <div class="form-row">
+        <label>Total Pot (EGP)</label>
+        <input type="number" id="g-pot" min="0"/>
+      </div>
+      <div class="form-row">
+        <label>Monthly Contribution (EGP)</label>
+        <input type="number" id="g-contrib" min="0"/>
+      </div>
+      <div class="form-row">
+        <label>Start Month</label>
+        <select id="g-start"></select>
+      </div>
+      <div class="form-row">
+        <label style="color:var(--payout)">Payout Month ★</label>
+        <select id="g-payout" style="border-color:var(--payout)"></select>
+      </div>
+      <div class="form-row">
+        <label>End Month</label>
+        <select id="g-end"></select>
+      </div>
+      <div class="form-row" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="g-received" style="width:auto"/>
+        <label for="g-received" style="margin:0;cursor:pointer">Payout Already Received</label>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" style="flex:1" onclick="submitGam3a()">
+          <span id="form-btn-label">Add Gam3a</span>
+        </button>
+        <button class="btn btn-edit btn-sm" id="cancel-edit-btn" style="display:none" onclick="cancelEdit()">Cancel</button>
+      </div>
+    </div>
+
+    <hr class="divider"/>
+
+    <!-- Gam3a List -->
+    <div id="gam3a-list"><div class="empty">Loading...</div></div>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main id="main">
+  <div class="topbar">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('dashboard',this)">Dashboard</button>
+      <button class="tab" onclick="switchTab('scenario',this)">Scenario Simulator</button>
+    </div>
+    <button class="btn-chat" onclick="toggleChat()">
+      <span class="chat-dot"></span> AI Advisor
+    </button>
+  </div>
+
+  <div id="content">
+    <!-- DASHBOARD TAB -->
+    <div id="tab-dashboard">
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card blue"><div class="kpi-label">Total Capital Invested</div><div class="kpi-value" id="kpi-invested">—</div><div class="kpi-sub">Cumulative inflows</div></div>
+        <div class="kpi-card green"><div class="kpi-label">Total Interest Earned</div><div class="kpi-value" id="kpi-interest">—</div><div class="kpi-sub" id="kpi-yield">Effective yield</div></div>
+        <div class="kpi-card red"><div class="kpi-label">Total Payments Out</div><div class="kpi-value" id="kpi-payments">—</div><div class="kpi-sub">Gam3a contributions</div></div>
+        <div class="kpi-card amber"><div class="kpi-label">Final Projected Balance</div><div class="kpi-value" id="kpi-balance">—</div><div class="kpi-sub">December closing</div></div>
+      </div>
+      <div class="chart-card">
+        <h3>Fund Growth Over 12 Months</h3>
+        <div class="chart-wrap"><canvas id="main-chart"></canvas></div>
+      </div>
+      <div class="table-card">
+        <h3>Monthly Breakdown</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Opening</th>
+                <th>Inflow</th>
+                <th>Interest</th>
+                <th>Payments Out</th>
+                <th>Closing</th>
+                <th>Cumul. Interest</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"><tr class="loading-row"><td colspan="7"><span class="spinner"></span>Loading simulation...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCENARIO TAB -->
+    <div id="tab-scenario" style="display:none">
+      <div class="scenario-header">
+        <h2 style="font-size:18px;font-weight:700">Scenario Simulator</h2>
+        <span class="scenario-badge">SIMULATION MODE</span>
+        <span class="scenario-note">Changes are not saved</span>
+      </div>
+
+      <div class="scenario-controls">
+        <div class="form-row" style="margin:0">
+          <label>Annual Rate (%)</label>
+          <input type="number" id="sc-rate" step="0.1" min="0" max="100" placeholder="19.0"/>
+        </div>
+        <div class="form-row" style="margin:0">
+          <label>Investment Day</label>
+          <input type="number" id="sc-day" min="1" max="28" placeholder="20"/>
+        </div>
+        <button class="btn btn-primary" onclick="runScenario()" style="white-space:nowrap">▶ Run Scenario</button>
+      </div>
+
+      <div class="inflows-grid">
+        <h3>Custom One-Time Inflows (EGP)</h3>
+        <div class="inflow-inputs" id="inflow-inputs"></div>
+      </div>
+
+      <div id="scenario-results" style="display:none">
+        <div class="kpi-grid sim-mode" id="sc-kpi-grid">
+          <div class="kpi-card blue"><div class="kpi-label">Total Capital Invested</div><div class="kpi-value" id="sc-kpi-invested">—</div></div>
+          <div class="kpi-card green"><div class="kpi-label">Total Interest Earned</div><div class="kpi-value" id="sc-kpi-interest">—</div><div class="kpi-sub" id="sc-kpi-yield"></div></div>
+          <div class="kpi-card red"><div class="kpi-label">Total Payments Out</div><div class="kpi-value" id="sc-kpi-payments">—</div></div>
+          <div class="kpi-card amber"><div class="kpi-label">Final Projected Balance</div><div class="kpi-value" id="sc-kpi-balance">—</div></div>
+        </div>
+        <div class="chart-card">
+          <h3>Scenario Fund Growth</h3>
+          <div class="chart-wrap"><canvas id="sc-chart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- AI CHAT DRAWER -->
+<div id="chat-drawer">
+  <div class="chat-header">
+    <div class="chat-header-info">
+      <h3>AI Financial Advisor</h3>
+      <p>Powered by Claude · Arabic &amp; English</p>
+    </div>
+    <button class="btn-close" onclick="toggleChat()">×</button>
+  </div>
+  <div class="chat-messages" id="chat-messages">
+    <div class="msg assistant">
+      Hello! I'm your personal finance advisor. Ask me anything about your Gam3ya investment strategy.
+      <div class="chips">
+        <span class="chip" onclick="sendChip(this)">Which month will my balance peak?</span>
+        <span class="chip" onclick="sendChip(this)">Is this strategy profitable?</span>
+        <span class="chip" onclick="sendChip(this)">Summarize my financial position</span>
+        <span class="chip" onclick="sendChip(this)">ما هو الشهر الأفضل لي؟</span>
+      </div>
+    </div>
+  </div>
+  <div class="chat-input-area">
+    <textarea id="chat-input" rows="1" placeholder="Ask about your finances..." onkeydown="chatKeydown(event)"></textarea>
+    <button class="btn-send" id="send-btn" onclick="sendChat()">➤</button>
+  </div>
+</div>
+
+<script>
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let editingId = null;
+let chatHistory = [];
+let mainChart = null;
+let scChart = null;
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  populateMonthDropdowns();
+  buildInflowInputs();
+  loadSettings();
+  loadGam3as();
+  loadSimulation();
+});
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const fmt = (n) => Number(n).toLocaleString('en-EG', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' EGP';
+const fmtShort = (n) => {
+  if(Math.abs(n)>=1000) return (n/1000).toFixed(1)+'K';
+  return Number(n).toFixed(0);
+};
+
+function api(path, opts={}) {
+  return fetch('/api' + path, {
+    headers: {'Content-Type':'application/json'},
+    ...opts
+  }).then(r => r.json());
+}
+
+function populateMonthDropdowns() {
+  ['g-start','g-payout','g-end'].forEach(id => {
+    const el = document.getElementById(id);
+    MONTH_NAMES.forEach((m,i) => {
+      const opt = document.createElement('option');
+      opt.value = i+1;
+      opt.textContent = m;
+      el.appendChild(opt);
+    });
+  });
+}
+
+function buildInflowInputs() {
+  const wrap = document.getElementById('inflow-inputs');
+  MONTHS.forEach((m,i) => {
+    const div = document.createElement('div');
+    div.className = 'inflow-input-wrap';
+    div.innerHTML = `<label>${m}</label><input type="number" id="inf-${i+1}" min="0" placeholder="0"/>`;
+    wrap.appendChild(div);
+  });
+}
+
+// ─── SETTINGS ────────────────────────────────────────────────────────────────
+async function loadSettings() {
+  const data = await api('/settings');
+  document.getElementById('s-rate').value = data.annual_rate;
+  document.getElementById('s-day').value = data.investment_day;
+  document.getElementById('sc-rate').placeholder = data.annual_rate;
+  document.getElementById('sc-day').placeholder = data.investment_day;
+}
+
+async function saveSettings() {
+  const rate = parseFloat(document.getElementById('s-rate').value);
+  const day = parseInt(document.getElementById('s-day').value);
+  if(isNaN(rate)||isNaN(day)){alert('Enter valid rate and day.');return;}
+  await api('/settings', {method:'PUT', body: JSON.stringify({annual_rate:rate, investment_day:day})});
+  loadSimulation();
+}
+
+// ─── GAM3AS ──────────────────────────────────────────────────────────────────
+async function loadGam3as() {
+  const list = await api('/gam3as');
+  renderGam3aList(list);
+}
+
+function renderGam3aList(list) {
+  const el = document.getElementById('gam3a-list');
+  if(!list.length){el.innerHTML='<div class="empty">No Gam3as yet. Add one above.</div>';return;}
+  el.innerHTML = list.map(g => `
+    <div class="gam3a-card">
+      <div class="gam3a-card-header">
+        <span class="gam3a-name">${g.name}</span>
+        <span class="badge ${g.payout_received?'badge-received':'badge-pending'}">${g.payout_received?'Received':'Pending'}</span>
+      </div>
+      <div class="gam3a-info">
+        <div>Pot: <span class="green">${Number(g.total_pot).toLocaleString()} EGP</span></div>
+        <div>Monthly: <span class="red">-${Number(g.monthly_contribution).toLocaleString()} EGP</span></div>
+        <div>Pay Window: ${MONTHS[g.start_month-1]} → ${MONTHS[g.end_month-1]}</div>
+        <div>Payout: <span class="amber">${MONTH_NAMES[g.payout_month-1]}</span></div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-edit btn-sm" onclick="editGam3a(${g.id})">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteGam3a(${g.id},'${g.name}')">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+async function submitGam3a() {
+  const payload = {
+    name: document.getElementById('g-name').value.trim(),
+    total_pot: parseFloat(document.getElementById('g-pot').value),
+    monthly_contribution: parseFloat(document.getElementById('g-contrib').value),
+    start_month: parseInt(document.getElementById('g-start').value),
+    payout_month: parseInt(document.getElementById('g-payout').value),
+    end_month: parseInt(document.getElementById('g-end').value),
+    payout_received: document.getElementById('g-received').checked,
+    active: true,
+  };
+  if(!payload.name||isNaN(payload.total_pot)||isNaN(payload.monthly_contribution)){
+    alert('Please fill in all required fields.');return;
+  }
+  if(editingId){
+    await api('/gam3as/'+editingId, {method:'PUT', body:JSON.stringify(payload)});
+    cancelEdit();
+  } else {
+    await api('/gam3as', {method:'POST', body:JSON.stringify(payload)});
+    clearGam3aForm();
+  }
+  loadGam3as();
+  loadSimulation();
+}
+
+async function editGam3a(id) {
+  const list = await api('/gam3as');
+  const g = list.find(x=>x.id===id);
+  if(!g) return;
+  editingId = id;
+  document.getElementById('g-name').value = g.name;
+  document.getElementById('g-pot').value = g.total_pot;
+  document.getElementById('g-contrib').value = g.monthly_contribution;
+  document.getElementById('g-start').value = g.start_month;
+  document.getElementById('g-payout').value = g.payout_month;
+  document.getElementById('g-end').value = g.end_month;
+  document.getElementById('g-received').checked = g.payout_received;
+  document.getElementById('form-btn-label').textContent = 'Save Changes';
+  document.getElementById('cancel-edit-btn').style.display = 'inline-block';
+  document.getElementById('g-name').scrollIntoView({behavior:'smooth'});
+}
+
+function cancelEdit() {
+  editingId = null;
+  clearGam3aForm();
+  document.getElementById('form-btn-label').textContent = 'Add Gam3a';
+  document.getElementById('cancel-edit-btn').style.display = 'none';
+}
+
+function clearGam3aForm() {
+  ['g-name','g-pot','g-contrib'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('g-start').value = 1;
+  document.getElementById('g-payout').value = 1;
+  document.getElementById('g-end').value = 12;
+  document.getElementById('g-received').checked = false;
+}
+
+async function deleteGam3a(id, name) {
+  if(!confirm(`Delete "${name}"?`)) return;
+  await api('/gam3as/'+id, {method:'DELETE'});
+  loadGam3as();
+  loadSimulation();
+}
+
+// ─── SIMULATION ───────────────────────────────────────────────────────────────
+async function loadSimulation() {
+  const data = await api('/simulate');
+  renderKpis(data.kpis, 'kpi');
+  renderTable(data.rows);
+  renderChart('main-chart', data.rows, mainChart, c => mainChart = c);
+}
+
+function renderKpis(kpis, prefix) {
+  document.getElementById(prefix+'-invested').textContent = fmt(kpis.total_invested);
+  document.getElementById(prefix+'-interest').textContent = fmt(kpis.total_interest);
+  document.getElementById(prefix+'-payments').textContent = fmt(kpis.total_payments_out);
+  document.getElementById(prefix+'-balance').textContent = fmt(kpis.final_balance);
+  const yieldEl = document.getElementById(prefix+'-yield');
+  if(yieldEl) yieldEl.textContent = `Effective yield: ${kpis.effective_yield}%`;
+}
+
+function renderTable(rows) {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = rows.map(r => {
+    const isNeg = r.closing_balance < 0;
+    const closingClass = isNeg ? 'val-red' : '';
+    const payoutBadge = r.is_payout_month ? `<span class="payout-badge">Payout</span>` : '';
+    return `<tr class="${r.is_payout_month?'payout-row':''}">
+      <td>${r.month_name.slice(0,3)}${payoutBadge}</td>
+      <td>${fmt(r.opening_balance)}</td>
+      <td class="${r.inflow>0?'val-green':''}">${r.inflow>0?'+':''}${fmt(r.inflow)}</td>
+      <td class="${r.interest>0?'val-green':''}">${r.interest>0?'+':''}${fmt(r.interest)}</td>
+      <td class="${r.payments_out>0?'val-red':''}">${r.payments_out>0?'-':''}${fmt(r.payments_out)}</td>
+      <td class="${closingClass}">${fmt(r.closing_balance)}</td>
+      <td class="val-green">+${fmt(r.cumul_interest)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderChart(canvasId, rows, existing, setter) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  if(existing) existing.destroy();
+  const labels = rows.map(r=>r.month_name.slice(0,3));
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {label:'Closing Balance',data:rows.map(r=>r.closing_balance),borderColor:'#3B82F6',backgroundColor:'rgba(59,130,246,.1)',tension:.35,fill:true,pointRadius:3,pointHoverRadius:6},
+        {label:'Cumul. Invested',data:rows.map(r=>r.cumul_invested),borderColor:'#F59E0B',backgroundColor:'transparent',tension:.35,pointRadius:3,pointHoverRadius:6},
+        {label:'Cumul. Interest',data:rows.map(r=>r.cumul_interest),borderColor:'#10B981',backgroundColor:'transparent',tension:.35,pointRadius:3,pointHoverRadius:6},
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{labels:{color:'#94A3B8',font:{size:11},boxWidth:12}},
+        tooltip:{
+          backgroundColor:'#16213E',borderColor:'rgba(15,52,96,.8)',borderWidth:1,
+          titleColor:'#94A3B8',bodyColor:'#fff',
+          callbacks:{label: ctx => ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString()} EGP`}
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#94A3B8',font:{size:11}},grid:{color:'rgba(15,52,96,.4)'}},
+        y:{ticks:{color:'#94A3B8',font:{size:11},callback:v=>fmtShort(v)+''},grid:{color:'rgba(15,52,96,.4)'}}
+      }
+    }
+  });
+  setter(chart);
+}
+
+// ─── SCENARIO ────────────────────────────────────────────────────────────────
+async function runScenario() {
+  const payload = {};
+  const rate = parseFloat(document.getElementById('sc-rate').value);
+  const day = parseInt(document.getElementById('sc-day').value);
+  if(!isNaN(rate)) payload.annual_rate = rate;
+  if(!isNaN(day)) payload.investment_day = day;
+
+  const extra = {};
+  for(let m=1;m<=12;m++){
+    const v = parseFloat(document.getElementById('inf-'+m).value);
+    if(!isNaN(v)&&v>0) extra[String(m)]=v;
+  }
+  if(Object.keys(extra).length) payload.extra_inflows = extra;
+
+  const data = await api('/simulate/scenario', {method:'POST', body:JSON.stringify(payload)});
+  document.getElementById('scenario-results').style.display='block';
+  renderKpis(data.kpis, 'sc-kpi');
+  document.getElementById('sc-kpi-yield').textContent = `Effective yield: ${data.kpis.effective_yield}%`;
+  renderChart('sc-chart', data.rows, scChart, c => scChart = c);
+  document.getElementById('scenario-results').scrollIntoView({behavior:'smooth'});
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.getElementById('tab-dashboard').style.display = name==='dashboard'?'':'none';
+  document.getElementById('tab-scenario').style.display  = name==='scenario'?'':'none';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ─── CHAT ─────────────────────────────────────────────────────────────────────
+function toggleChat() {
+  document.getElementById('chat-drawer').classList.toggle('open');
+}
+
+function sendChip(el) {
+  document.getElementById('chat-input').value = el.textContent;
+  sendChat();
+}
+
+function chatKeydown(e) {
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if(!msg) return;
+  input.value='';
+  document.getElementById('send-btn').disabled=true;
+
+  appendMsg('user', msg);
+  chatHistory.push({role:'user',content:msg});
+
+  const typing = appendTyping();
+
+  try {
+    const data = await api('/chat', {method:'POST', body:JSON.stringify({message:msg, history:chatHistory.slice(0,-1)})});
+    typing.remove();
+    appendMsg('assistant', data.reply||data.detail||'Error');
+    if(data.reply) chatHistory.push({role:'assistant',content:data.reply});
+  } catch(e) {
+    typing.remove();
+    appendMsg('assistant','⚠️ Error connecting to AI. Check your ANTHROPIC_API_KEY.');
+  }
+  document.getElementById('send-btn').disabled=false;
+}
+
+const isArabic = s => /[\u0600-\u06FF]/.test(s);
+
+function appendMsg(role, text) {
+  const el = document.createElement('div');
+  el.className = `msg ${role}${isArabic(text)?' rtl':''}`;
+  el.textContent = text;
+  const wrap = document.getElementById('chat-messages');
+  wrap.appendChild(el);
+  wrap.scrollTop = wrap.scrollHeight;
+  return el;
+}
+
+function appendTyping() {
+  const el = document.createElement('div');
+  el.className = 'typing';
+  el.innerHTML = '<span></span><span></span><span></span>';
+  const wrap = document.getElementById('chat-messages');
+  wrap.appendChild(el);
+  wrap.scrollTop = wrap.scrollHeight;
+  return el;
+}
+</script>
+</body>
+</html>

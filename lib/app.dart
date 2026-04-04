@@ -1,3 +1,5 @@
+import 'package:device_preview/device_preview.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'core/constants/app_colors.dart';
@@ -12,6 +14,8 @@ class App extends StatelessWidget {
       title: 'Gam3ya',
       debugShowCheckedModeBanner: false,
       routerConfig: appRouter,
+      locale: kReleaseMode ? null : DevicePreview.locale(context),
+      builder: kReleaseMode ? null : DevicePreview.appBuilder,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: AppColors.background,
       ),
